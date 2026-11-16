@@ -1,0 +1,32 @@
+{
+  "customers": [
+    {
+      "id": 101,
+      "name": "Транспортная компания",
+      "custom_fields_values": {
+        "Логин": {"value": "transport"},
+        "Система": {"value": "GPS"}
+      },
+      "_embedded": {
+        "contacts": [{"id": 301, "name": "Иван"}],
+        "companies": [{"id": 401, "name": "Транспортная компания"}]
+      }
+    },
+    {
+      "id": 102,
+      "name": "Покупатель без логина будет пропущен"
+    }
+  ],
+  "leads": [
+    {
+      "id": 201,
+      "name": "Мониторинг автопарка",
+      "custom_fields_values": {"Логин": {"value": "transport"}},
+      "_embedded": {"contacts": [{"id": 301}]}
+    },
+    {
+      "id": 202,
+      "name": "Заявка без покупателя"
+    }
+  ]
+}

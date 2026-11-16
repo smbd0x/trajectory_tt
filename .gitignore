@@ -19,3 +19,7 @@ celerybeat-schedule.db
 celery_env
 env
 .env
+.pytest_cache/
+.test-postgres/
+.test-postgres.log
+.coverage

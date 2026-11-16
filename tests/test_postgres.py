@@ -62,6 +62,29 @@ def test_merge_is_saved_in_lead_row_and_current_lead_is_updated(pg_app):
     assert rows[0]["amo_contacts"][0]["general"]["id"] == 30
 
 
+@pytest.mark.parametrize("related", ["contacts", "companies"])
+def test_merge_preserves_fresh_shared_related_entities(pg_app, related):
+    seed(customers=[entity(Customer, 10, "same")], **{related: [{
+        "general": {"id": 30, "name": "удалить старое имя"},
+        "api_value": {"id": 30, "name": "удалить старое имя"},
+    }]})
+    target_id = seed(leads=[entity(Lead, 20, "old"), entity(Lead, 21, "other")])
+    collect_leads_customers(crm_get=crm_source(
+        customers=[entity(Customer, 10, "same", **{related: [{"id": 30}]})],
+        leads=[
+            entity(Lead, 21, "other", **{related: [{"id": 30, "name": "Актуальное имя"}]}),
+            entity(Lead, 20, "same", **{related: [{"id": 30}]}),
+        ],
+    ))
+    rows = read_rows()
+    assert len(rows) == 1
+    assert rows[0]["id"] == target_id
+    assert rows[0]["amo_" + related] == [{
+        "general": {"id": 30, "name": "Актуальное имя"},
+        "api_value": {"id": 30, "name": "Актуальное имя"},
+    }]
+
+
 @pytest.mark.parametrize("failed_class", [Customer, Lead])
 def test_interrupted_crm_iterator_leaves_database_unchanged(pg_app, failed_class):
     seed(customers=[entity(Customer, 10, "same")], leads=[entity(Lead, 20, "same")])

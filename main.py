@@ -37,6 +37,7 @@ class SyncState:
         self.rows = {}
         self.by_id = {field: {} for field in PRIMARY_FIELDS}
         self.by_login = {field: defaultdict(set) for field in PRIMARY_FIELDS}
+        self.related_by_id = {field: {} for field in RELATED_FIELDS}
         self.seen = {field: set() for field in PRIMARY_FIELDS}
         self.deleted_ids = set()
         self.next_id = -1
@@ -47,6 +48,15 @@ class SyncState:
             for field in JSON_FIELDS:
                 row[field] = {item["general"]["id"]: item
                               for item in row[field] or []}
+            # Общий контакт или компания имеют одну версию во всех строках.
+            for field in RELATED_FIELDS:
+                for crm_id, item in row[field].items():
+                    shared = self.related_by_id[field].setdefault(
+                        crm_id, {"general": {}, "api_value": {}},
+                    )
+                    for part in ("general", "api_value"):
+                        shared[part].update(item.get(part) or {})
+                    row[field][crm_id] = shared
             self.rows[row["id"]] = row
             for field in PRIMARY_FIELDS:
                 for crm_id, item in row[field].items():
@@ -100,7 +110,11 @@ class SyncState:
                               ("amo_companies", entity.companies)):
             stored = self.rows[row_id][field]
             for value in values:
-                stored[value["id"]] = get_related_json(value, stored.get(value["id"]))
+                shared = self.related_by_id[field].setdefault(value["id"], {})
+                # Обновляем тот же объект: слияние не вернёт старую копию,
+                # а ссылка только с id не затрёт уже известные подробности.
+                shared.update(get_related_json(value, shared))
+                stored[value["id"]] = shared
 
     def merge(self, target_id, source_id):
         target, source = self.rows[target_id], self.rows[source_id]

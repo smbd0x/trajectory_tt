@@ -150,6 +150,46 @@ def test_related_id_only_does_not_erase_existing_details():
     assert state.rows[1]["amo_contacts"][30] == contact
 
 
+@pytest.mark.parametrize("related", ["contacts", "companies"])
+@pytest.mark.parametrize("details_in_source", [False, True])
+def test_merge_keeps_related_details_with_id_only_links(related, details_in_source):
+    details = {"id": 30, "name": "Сохранённые подробности"}
+    source_value = details if details_in_source else {"id": 30}
+    target_value = {"id": 30} if details_in_source else details
+    state = SyncState([
+        saved_row(1, customers=[entity(Customer, 10, "same")],
+                  **{related: [get_related_json(source_value)]}),
+        saved_row(2, leads=[entity(Lead, 20, "old")],
+                  **{related: [get_related_json(target_value)]}),
+    ])
+    links = {related: [{"id": 30}]}
+    state.apply_customer(entity(Customer, 10, "same", **links))
+    state.apply_lead(entity(Lead, 20, "same", **links))
+    state.cleanup()
+    assert set(state.rows) == {2}
+    stored = state.rows[2]["amo_" + related][30]
+    assert stored["general"]["name"] == "Сохранённые подробности"
+    assert stored["api_value"]["name"] == "Сохранённые подробности"
+
+
+@pytest.mark.parametrize("related", ["contacts", "companies"])
+def test_shared_related_update_reaches_rows_processed_earlier(related):
+    state = SyncState([
+        saved_row(1, customers=[entity(Customer, 10, "first")], **{related: [
+            get_related_json({"id": 30, "name": "удалить старое имя"}),
+        ]}),
+        saved_row(2, customers=[entity(Customer, 11, "second")]),
+    ])
+    state.apply_customer(entity(Customer, 10, "first", **{related: [{"id": 30}]}))
+    state.apply_customer(entity(Customer, 11, "second", **{related: [
+        {"id": 30, "name": "Актуальное имя"},
+    ]}))
+    state.cleanup()
+    assert set(state.rows) == {1, 2}
+    for row in state.rows.values():
+        assert row["amo_" + related][30]["general"]["name"] == "Актуальное имя"
+
+
 def test_empty_full_export_removes_every_row():
     state = SyncState([saved_row(1, leads=[entity(Lead, 20)])])
     state.cleanup()
